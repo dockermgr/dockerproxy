@@ -12,8 +12,8 @@
 # @@Description      :  Container installer script for dockerproxy
 # @@Changelog        :  New script
 # @@TODO             :  Completely rewrite/refactor/variable cleanup
-# @@Other            :  
-# @@Resource         :  
+# @@Other            :
+# @@Resource         :
 # @@Terminal App     :  no
 # @@sudo/root        :  no
 # @@Template         :  installers/dockermgr
@@ -299,8 +299,9 @@ HOST_ETC_RESOLVE_INIT_FILE=""
 HOST_ETC_HOSTS_ENABLED="no"
 HOST_ETC_HOSTS_INIT_FILE=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Mount docker socket - [yes/no] [/var/run/docker.sock]
+# Mount docker socket - [yes/no] [/var/run/docker.sock] [yes/no]
 DOCKER_SOCKET_ENABLED="no"
+DOCKER_SOCKER_READONLY="yes"
 DOCKER_SOCKET_MOUNT=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Mount docker config - [yes/no] [~/.docker/config.json] [/root/.docker/config.json]
@@ -328,8 +329,8 @@ HOST_PROC_MOUNT_ENABLED="no"
 HOST_MODULES_MOUNT_ENABLED="no"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Set container hostname and domain - Default: [dockerproxy.$SET_HOST_FULL_NAME] [$SET_HOST_FULL_DOMAIN]
-CONTAINER_HOSTNAME=""
-CONTAINER_DOMAINNAME=""
+CONTAINER_HOSTNAME="$SET_SHORT_HOSTNAME"
+CONTAINER_DOMAINNAME="$SET_DOMAIN_NAME"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Set the network type - default is bridge - [bridge/host]
 HOST_DOCKER_NETWORK="bridge"
@@ -347,7 +348,7 @@ CONTAINER_PROTOCOL="http"
 CONTAINER_DNS=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Setup nginx proxy variables - [yes/no] [yes/no] [http] [https] [yes/no]
-HOST_NGINX_ENABLED="yes"
+HOST_NGINX_ENABLED="no"
 HOST_NGINX_SSL_ENABLED="yes"
 HOST_NGINX_HTTP_PORT="80"
 HOST_NGINX_HTTPS_PORT="443"
@@ -372,7 +373,7 @@ CONTAINER_WEB_SERVER_VHOSTS=""
 CONTAINER_ADD_RANDOM_PORTS=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Add custom port -  [exter:inter] or [.all:exter:inter/[tcp,udp] [listen:exter:inter/[tcp,udp]] random:[inter]
-CONTAINER_ADD_CUSTOM_PORT=""
+CONTAINER_ADD_CUSTOM_PORT=".all:2375:2375"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # mail settings - [yes/no] [user] [domainname] [server]
 CONTAINER_EMAIL_ENABLED=""
@@ -397,7 +398,7 @@ CONTAINER_DATABASE_CREATE=""
 # Database settings - [listen] [yes/no]
 CONTAINER_DATABASE_LISTEN=""
 CONTAINER_REDIS_ENABLED="no"
-CONTAINER_SQLITE_ENABLED="yes"
+CONTAINER_SQLITE_ENABLED="no"
 CONTAINER_MARIADB_ENABLED="no"
 CONTAINER_MONGODB_ENABLED="no"
 CONTAINER_COUCHDB_ENABLED="no"
@@ -453,8 +454,8 @@ CONTAINER_DEVICES=""
 CONTAINER_DEVICES+=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Define additional variables - [myvar=var,myothervar=othervar]
-CONTAINER_ENV=""
-CONTAINER_ENV+=""
+CONTAINER_ENV="CONTAINERS=1,SERVICES=1,"
+CONTAINER_ENV+="TASKS=1,POST=0"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Set sysctl - []
 CONTAINER_SYSCTL=""
@@ -1162,11 +1163,16 @@ fi
 if [ "$DOCKER_SOCKET_ENABLED" = "yes" ]; then
   if [ -z "$DOCKER_SOCKET_MOUNT" ]; then
     if [ -e "/var/run/docker.sock" ]; then
-      DOCKER_SET_OPTIONS+=("--volume /var/run/docker.sock:/var/run/docker.sock")
+      DOCKER_SOCKET_TMP_MOUNT="/var/run/docker.sock:/var/run/docker.sock"
     elif [ -e "$DOCKER_SOCKET_MOUNT" ]; then
-      DOCKER_SET_OPTIONS+=("--volume $DOCKER_SOCKET_MOUNT:/var/run/docker.sock")
+      DOCKER_SOCKET_TMP_MOUNT="$DOCKER_SOCKET_MOUNT:/var/run/docker.sock"
     fi
   fi
+  if [ "$DOCKER_SOCKER_READONLY" = "yes" ]; then
+    DOCKER_SOCKET_TMP_MOUNT="$DOCKER_SOCKET_TMP_MOUNT:ro"
+  fi
+  DOCKER_SET_OPTIONS+=("--volume $DOCKER_SOCKET_TMP_MOUNT")
+  unset DOCKER_SOCKET_TMP_MOUNT
 fi
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Mount docker config in the container
@@ -2547,10 +2553,7 @@ if [ "$CONTAINER_INSTALLED" = "true" ] || __docker_ps_all -q; then
     __printf_color "2" "$POST_SHOW_FINISHED_MESSAGE"
     printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n'
   fi
-  characters=${#APPNAME}
-  spacing=$((characters))
-  install_dir=$(printf "%-${spacing}s" "" "$APPDIR")
-  __printf_spacing_color "6" "40" "$APPNAME has been installed to:" "$install_dir"
+  __printf_spacing_color "6" "40" "$APPNAME has been installed to:" "$APPDIR"
   printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n\n'
   __show_post_message
 else
