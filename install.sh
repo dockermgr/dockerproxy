@@ -429,10 +429,10 @@ CONTAINER_WEB_SERVER_VHOSTS=""
 CONTAINER_ADD_RANDOM_PORTS=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Add custom port -  [exter:inter] or [.all:exter:inter/[tcp,udp] [listen:exter:inter/[tcp,udp]] random:[inter]
-CONTAINER_ADD_CUSTOM_PORT=""
+CONTAINER_ADD_CUSTOM_PORT=".all:$CONTAINER_WEB_SERVER_INT_PORT:$CONTAINER_WEB_SERVER_INT_PORT"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Create a single port mapping [listen]:[externalPort/random]:[internalPort]
-CONTAINER_ADD_CUSTOM_SINGLE="$CONTAINER_WEB_SERVER_INT_PORT:$CONTAINER_WEB_SERVER_INT_PORT"
+CONTAINER_ADD_CUSTOM_SINGLE=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # mail settings - [yes/no] [user] [domainname] [server]
 CONTAINER_EMAIL_ENABLED=""
