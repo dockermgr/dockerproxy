@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-##@Version           :  202410011005-git
+##@Version           :  202410011303-git
 # @@Author           :  Jason Hempstead
 # @@Contact          :  jason@casjaysdev.pro
 # @@License          :  LICENSE.md
 # @@ReadME           :  install.sh --help
 # @@Copyright        :  Copyright: (c) 2024 Jason Hempstead, Casjays Developments
-# @@Created          :  Tuesday, Oct 01, 2024 10:05 EDT
+# @@Created          :  Tuesday, Oct 01, 2024 13:03 EDT
 # @@File             :  install.sh
 # @@Description      :  Container installer script for dockerproxy
 # @@Changelog        :  New script
@@ -29,7 +29,7 @@
 # shellcheck disable=SC2317
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 export APPNAME="dockerproxy"
-export VERSION="202410011005-git"
+export VERSION="202410011303-git"
 export REPO_BRANCH="${GIT_REPO_BRANCH:-main}"
 export USER="${SUDO_USER:-$USER}"
 export RUN_USER="${RUN_USER:-$USER}"
@@ -110,6 +110,29 @@ dockermgr_req_version "$APPVERSION"
 __sudo_root() { [ "$DOCKERMGR_USER_CAN_SUDO" = "true" ] && sudo "$@" || { [ "$USER" = "root" ] && eval "$*"; } || eval "$*" 2>/dev/null || return 1; }
 __sudo_exec() { [ "$DOCKERMGR_USER_CAN_SUDO" = "true" ] && sudo -HE "$@" || { [ "$USER" = "root" ] && eval "$*"; } || eval "$*" 2>/dev/null || return 1; }
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+__rport() {
+  local port=""
+  port="$(__port)"
+  while :; do
+    { [ $port -lt 50000 ] && [ $port -gt 50999 ]; } && port="$(__port)"
+    __port_in_use "$port" && break
+  done
+  echo "$port" | head -n1
+}
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+__test_public_reachable() {
+  local exitCode=0
+  local port="${1:-$(__port)}"
+  local nc="$(builtin type -P nc || builtin type -P netcat || false)"
+  if [ -n "$nc" ]; then
+    (timeout 20 $nc -l $port &) &>/dev/null
+    curl -q -LSsf -4 "https://ifconfig.co/port/$port" | jq -rc '.reachable' | grep -q 'true' || exitCode=1
+  else
+    exitCode=1
+  fi
+  return $exitCode
+}
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # printf_space spacing color message value
 __printf_space() {
   local color padlength
@@ -139,6 +162,8 @@ __container_is_running() { docker ps 2>&1 | grep -i "$CONTAINER_NAME" | grep -qi
 __docker_init() { [ -n "$(type -p dockermgr 2>/dev/null)" ] && dockermgr init || printf_exit "Failed to Initialize the docker installer"; }
 __netstat() { netstat -taupln 2>/dev/null | grep -vE 'WAIT|ESTABLISHED|docker-pro' | awk -F ' ' '{print $4}' | sed 's|.*:||g' | grep -E '[0-9]' | sort -Vu | grep "^${1:-.*}$" || return 1; }
 __retrieve_custom_env() { [ -f "$DOCKERMGR_CONFIG_DIR/env/$CONTAINER_NAME.${1:-custom}.conf" ] && cat "$DOCKERMGR_CONFIG_DIR/env/$CONTAINER_NAME.${1:-custom}.conf" | grep -Ev '^$|^#' | grep '=' | grep '^' || __custom_docker_env | grep -Ev '^$|^#' | grep '=' | grep '^' || return 1; }
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+__get_proxy_url() { echo "${1//\/*{/}" | grep -q '[0-9]:.*:[0-9]' && echo "${1%:*}" || echo "$1"; }
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 __ping_host() { ping -c1 -i1 -w1 "${1:-$CONTAINER_HOSTNAME}" >/dev/null 2>&1 || return 1; }
 __domain_name() { hostname -d 2>/dev/null | grep -vF '(none)' | grep -F '.' | grep '^' || hostname -f 2>/dev/null | sed 's/^[^.:]*[.:]//' | __grep_char || return 1; }
@@ -384,7 +409,7 @@ HOST_NGINX_VHOST_CONFIG_NAME=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Enable this if container is running a webserver - [yes/no] [internalPort] [yes/no] [yes/no] [listen]
 CONTAINER_WEB_SERVER_ENABLED="no"
-CONTAINER_WEB_SERVER_INT_PORT="80"
+CONTAINER_WEB_SERVER_INT_PORT="2375"
 CONTAINER_WEB_SERVER_SSL_ENABLED="no"
 CONTAINER_WEB_SERVER_AUTH_ENABLED="no"
 CONTAINER_WEB_SERVER_LISTEN_ON="127.0.0.10"
@@ -403,7 +428,10 @@ CONTAINER_WEB_SERVER_VHOSTS=""
 CONTAINER_ADD_RANDOM_PORTS=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Add custom port -  [exter:inter] or [.all:exter:inter/[tcp,udp] [listen:exter:inter/[tcp,udp]] random:[inter]
-CONTAINER_ADD_CUSTOM_PORT=".all:2375:2375"
+CONTAINER_ADD_CUSTOM_PORT=""
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Create a single port mapping [listen]:[externalPort/random]:[internalPort]
+CONTAINER_ADD_CUSTOM_SINGLE="$CONTAINER_WEB_SERVER_INT_PORT:$CONTAINER_WEB_SERVER_INT_PORT"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # mail settings - [yes/no] [user] [domainname] [server]
 CONTAINER_EMAIL_ENABLED=""
@@ -587,6 +615,31 @@ __setup_cron() {
 # Set custom container enviroment variables - [MYVAR="VAR"]
 __custom_docker_env() {
   cat <<EOF | tee -p | grep -v '^$'
+AUTH=0
+POST=0
+PING=1
+INFO=1
+EXEC=0
+GRPC=0
+NODES=1
+BUILD=1
+SWARM=1
+TASKS=1
+IMAGES=1
+SYSTEM=1
+COMMIT=0
+SESSION=0
+VOLUMES=1
+SECRETS=0
+CONFIGS=0
+PLUGINS=0
+SERVICES=0
+NETWORKS=1
+CONTAINERS=1
+ALLOW_START=0
+ALLOW_STOP=0
+DISTRIBUTION=0
+ALLOW_RESTARTS=0
 
 EOF
 }
@@ -729,6 +782,7 @@ ENV_CONTAINER_WEB_SERVER_WWW_REPO="\${ENV_CONTAINER_WEB_SERVER_WWW_REPO:-$CONTAI
 ENV_CONTAINER_WEB_SERVER_VHOSTS="\${ENV_CONTAINER_WEB_SERVER_VHOSTS:-$CONTAINER_WEB_SERVER_VHOSTS}"
 ENV_CONTAINER_ADD_RANDOM_PORTS="\${ENV_CONTAINER_ADD_RANDOM_PORTS:-$CONTAINER_ADD_RANDOM_PORTS}"
 ENV_CONTAINER_ADD_CUSTOM_PORT="\${ENV_CONTAINER_ADD_CUSTOM_PORT:-$CONTAINER_ADD_CUSTOM_PORT}"
+ENV_CONTAINER_ADD_CUSTOM_SINGLE="\${ENV_CONTAINER_ADD_CUSTOM_SINGLE:-$CONTAINER_ADD_CUSTOM_SINGLE}"
 ENV_CONTAINER_EMAIL_ENABLED="\${ENV_CONTAINER_EMAIL_ENABLED:-$CONTAINER_EMAIL_ENABLED}"
 ENV_CONTAINER_EMAIL_USER="\${ENV_CONTAINER_EMAIL_USER:-$CONTAINER_EMAIL_USER}"
 ENV_CONTAINER_EMAIL_DOMAIN="\${ENV_CONTAINER_EMAIL_DOMAIN:-$CONTAINER_EMAIL_DOMAIN}"
@@ -861,34 +915,11 @@ EOF
 # Define extra functions
 __custom_docker_clean_env() { grep -Ev '^$|^#' | sed 's|^|--env |g' | grep '\--' | grep -v '\--env \\' | tr '\n' ' ' | __remove_extra_spaces; }
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-__rport() {
-  local port=""
-  port="$(__port)"
-  while :; do
-    { [ $port -lt 50000 ] && [ $port -gt 50999 ]; } && port="$(__port)"
-    __port_in_use "$port" && break
-  done
-  echo "$port" | head -n1
-}
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 __trim() {
   local var="$*"
   var="${var#"${var%%[![:space:]]*}"}" # remove leading whitespace characters
   var="${var%"${var##*[![:space:]]}"}" # remove trailing whitespace characters
   printf '%s' "$var" | grep -v '^$' | sort -u | __remove_extra_spaces
-}
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-__test_public_reachable() {
-  local exitCode=0
-  local port="${1:-$(__port)}"
-  local nc="$(builtin type -P nc || builtin type -P netcat || false)"
-  if [ -n "$nc" ]; then
-    (timeout 20 $nc -l $port &) &>/dev/null
-    curl -q -LSsf -4 "https://ifconfig.co/port/$port" | jq -rc '.reachable' | grep -q 'true' || exitCode=1
-  else
-    exitCode=1
-  fi
-  return $exitCode
 }
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 __create_docker_script() {
@@ -1203,6 +1234,7 @@ CONTAINER_WEB_SERVER_WWW_REPO="${ENV_CONTAINER_WEB_SERVER_WWW_REPO:-$CONTAINER_W
 CONTAINER_WEB_SERVER_VHOSTS="${ENV_CONTAINER_WEB_SERVER_VHOSTS:-$CONTAINER_WEB_SERVER_VHOSTS}"
 CONTAINER_ADD_RANDOM_PORTS="${ENV_CONTAINER_ADD_RANDOM_PORTS:-$CONTAINER_ADD_RANDOM_PORTS}"
 CONTAINER_ADD_CUSTOM_PORT="${ENV_CONTAINER_ADD_CUSTOM_PORT:-$CONTAINER_ADD_CUSTOM_PORT}"
+CONTAINER_ADD_CUSTOM_SINGLE="${ENV_CONTAINER_ADD_CUSTOM_SINGLE:-$CONTAINER_ADD_CUSTOM_SINGLE}"
 CONTAINER_EMAIL_ENABLED="${ENV_CONTAINER_EMAIL_ENABLED:-$CONTAINER_EMAIL_ENABLED}"
 CONTAINER_EMAIL_USER="${ENV_CONTAINER_EMAIL_USER:-$CONTAINER_EMAIL_USER}"
 CONTAINER_EMAIL_DOMAIN="${ENV_CONTAINER_EMAIL_DOMAIN:-$CONTAINER_EMAIL_DOMAIN}"
@@ -1630,8 +1662,9 @@ HOST_LISTEN_ADDR="${HOST_LISTEN_ADDR//:*/}"
 NGINX_VHOSTS_CONF_FILE_TMP="/tmp/$$.$APPNAME.conf"
 NGINX_VHOSTS_INC_FILE_TMP="/tmp/$$.$APPNAME.inc.conf"
 NGINX_VHOSTS_PROXY_FILE_TMP="/tmp/$$.$APPNAME.custom.conf"
+NGINX_TMP_FILES="$(__trim "$NGINX_VHOSTS_CONF_FILE_TMP" "$NGINX_VHOSTS_INC_FILE_TMP" "$NGINX_VHOSTS_PROXY_FILE_TMP")"
 NINGX_WRITABLE="$(sudo -n true && sudo bash -c '[ -w "/etc/nginx" ] && echo "true" || false' || echo 'false')"
-if [ "$HOST_NGINX_ENABLED" = "yes" ]; then
+if [ "$HOST_NGINX_ENABLED" = "yes" ] && [ "$CONTAINER_WEB_SERVER_ENABLED" = "yes" ]; then
   if [ -f "/etc/nginx/nginx.conf" ] && [ "$NINGX_WRITABLE" = "true" ]; then
     NGINX_DIR="/etc/nginx"
   else
@@ -1668,7 +1701,12 @@ if [ "$HOST_NGINX_ENABLED" = "yes" ]; then
   if [ ! -f "$NGINX_MAIN_CONFIG" ]; then
     HOST_NGINX_UPDATE_CONF="yes"
   fi
+else
+  for nginx_tmp in $NGINX_TMP_FILES; do
+    [ -f "$nginx_tmp" ] && rm -Rf "$nginx_tmp"
+  done
 fi
+unset nginx_tmp
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Setup containers web server
 if [ "$CONTAINER_WEB_SERVER_ENABLED" = "yes" ]; then
@@ -1759,6 +1797,13 @@ if [ "$CONTAINER_IS_TIME_SERVER" = "yes" ]; then
   service_port="$(__netstat "433" | grep -v 'docker' && __port || echo "433")"
   DOCKER_SET_TMP_PUBLISH+=("--publish $CONTAINER_SERVICE_PUBLIC:$service_port:433/tcp")
   unset service_port
+fi
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+if [ -n "$CONTAINER_ADD_CUSTOM_SINGLE" ]; then
+  if echo "$CONTAINER_ADD_CUSTOM_SINGLE" | grep -q ":random:"; then
+    CONTAINER_ADD_CUSTOM_SINGLE="${CONTAINER_ADD_CUSTOM_SINGLE//:random:/:$(__rport):}"
+  fi
+  DOCKER_SET_TMP_PUBLISH+=("--publish $CONTAINER_ADD_CUSTOM_SINGLE")
 fi
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Database setup
@@ -2284,6 +2329,7 @@ EOF
       fi
     fi
   done
+  [ "$CONTAINER_WEB_SERVER_ENABLED" = "yes" ] || rm -Rf "$NGINX_VHOSTS_PROXY_FILE_TMP"
   [ -n "$CONTAINER_PUBLISHED_PORT" ] && DOCKER_SET_TMP_PUBLISH=("${CONTAINER_PUBLISHED_PORT//--publish,/}")
   CONTAINER_PUBLISHED_PORT="${DOCKER_SET_TMP_PUBLISH[*]}"
   CONTAINER_PUBLISHED_PORT="${CONTAINER_PUBLISHED_PORT// /,}"
@@ -2655,9 +2701,14 @@ if [ "$NINGX_VHOSTS_WRITABLE" = "true" ]; then
   fi
   [ -f "$NGINX_MAIN_CONFIG" ] && NGINX_PROXY_URL="$CONTAINER_WEB_SERVER_PROTOCOL://$CONTAINER_HOSTNAME"
 fi
+if [ "$NGINX_VHOST_NAMES" = "" ] || [ "$NGINX_VHOST_NAMES" = " " ]; then
+  unset NGINX_VHOST_NAMES
+else
+  NGINX_VHOST_NAMES="${NGINX_VHOST_NAMES//,/ }"
+fi
 HOST_NGINX_PROXY_URL="${HOST_NGINX_PROXY_URL:-${NGNIX_REVERSE_ADDRESS:-$NGINX_PROXY_URL}}"
 NGNIX_REVERSE_ADDRESS="${CONTAINER_NGINX_PROXY_URL:-${NGNIX_REVERSE_ADDRESS:-$NGINX_PROXY_URL}}"
-{ [ "$NGINX_VHOST_NAMES" = "" ] || [ "$NGINX_VHOST_NAMES" = " " ]; } && unset NGINX_VHOST_NAMES
+CONTAINER_NGINX_PROXY_URL="${CONTAINER_NGINX_PROXY_URL:-$NGNIX_REVERSE_ADDRESS}"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Setup an internal host
 CONTAINER_SERVER_TEST_URL="${CONTAINER_SERVER_TEST_URL:-$NGNIX_REVERSE_ADDRESS}"
@@ -2711,6 +2762,8 @@ EOF
   NGINX_VHOST_NAMES="$NGINX_VHOST_NAMES $HOST_NGINX_INTERNAL_DOMAIN"
   [ -f "$NGINX_DIR/vhosts.d/$HOST_NGINX_INTERNAL_DOMAIN.conf" ] && NGINX_INTERNAL_IS_SET="$NGINX_DIR/vhosts.d/$HOST_NGINX_INTERNAL_DOMAIN.conf"
 fi
+CONTAINER_WEB_SERVER_VHOSTS="${CONTAINER_WEB_SERVER_VHOSTS:-$NGINX_VHOST_NAMES}"
+CONTAINER_WEB_SERVER_VHOSTS="${CONTAINER_WEB_SERVER_VHOSTS//,/ }"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # finalize
 __setup_cron
@@ -2720,9 +2773,8 @@ if [ "$CONTAINER_INSTALLED" = "true" ] || __docker_ps_all -q; then
   HOSTS_WRITABLE="$(sudo -n true && sudo bash -c '[ -w "/etc/hosts" ] && echo "true" || false' || echo 'false')"
   printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n'
   if [ "$HOSTS_WRITABLE" = "true" ]; then
-    if [ -n "$NGINX_VHOST_NAMES" ]; then
-      NGINX_VHOST_NAMES="${NGINX_VHOST_NAMES//,/ }"
-      for vhost in $NGINX_VHOST_NAMES; do
+    if [ -n "$CONTAINER_WEB_SERVER_VHOSTS" ] && [ "$CONTAINER_WEB_SERVER_VHOSTS" != " " ]; then
+      for vhost in $CONTAINER_WEB_SERVER_VHOSTS; do
         if ! grep -shhq " $vhost$" "/etc/hosts"; then
           if echo "$vhost" | grep -qFv '*'; then
             __printf_spacing_color "40" "Adding to /etc/hosts:" "$vhost $CONTAINER_WEB_SERVER_LISTEN_ON"
@@ -2796,6 +2848,9 @@ if [ "$CONTAINER_INSTALLED" = "true" ] || __docker_ps_all -q; then
   if [ "$NGINX_IS_INSTALLED" = "yes" ]; then
     __printf_spacing_color "6" "nginx vhost name:" "$CONTAINER_HOSTNAME"
     __printf_spacing_color "6" "nginx website:" "$NGINX_PROXY_URL"
+    if [ -n "$CONTAINER_NGINX_PROXY_URL" ]; then
+      __printf_spacing_color "6" "nginx reverse proxy" "$CONTAINER_NGINX_PROXY_URL"
+    fi
     if [ -f "$NGINX_CONF_FILE" ]; then
       __printf_spacing_color "6" "nginx config file installed to:" "$NGINX_CONF_FILE"
     fi
@@ -2819,6 +2874,21 @@ if [ "$CONTAINER_INSTALLED" = "true" ] || __docker_ps_all -q; then
         __printf_spacing_color "33" "vhost name:" "$vhost"
       done
     fi
+    printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n'
+  fi
+  if [ -n "$SET_PORT" ] && [ -n "$NGINX_PROXY_URL" ]; then
+    MESSAGE="true"
+    __printf_spacing_color "33" "Server address:" "$NGINX_PROXY_URL"
+    if [ -n "$NGINX_VHOST_NAMES" ]; then
+      NGINX_VHOST_NAMES="${NGINX_VHOST_NAMES//,/ }"
+      for vhost in $NGINX_VHOST_NAMES; do
+        __printf_spacing_color "33" "vhost name:" "$vhost"
+      done
+    fi
+    printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n'
+  fi
+  if [ -n "$CONTAINER_ADD_CUSTOM_SINGLE" ]; then
+    __printf_spacing_color "6" "Custom port mapping:" "$CONTAINER_ADD_CUSTOM_SINGLE"
     printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n'
   fi
   if [ -n "$CONTAINER_USER_ADMIN_HASH_PASS" ]; then
