@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-##@Version           :  202410011303-git
+##@Version           :  202410011527-git
 # @@Author           :  Jason Hempstead
 # @@Contact          :  jason@casjaysdev.pro
 # @@License          :  LICENSE.md
 # @@ReadME           :  install.sh --help
 # @@Copyright        :  Copyright: (c) 2024 Jason Hempstead, Casjays Developments
-# @@Created          :  Tuesday, Oct 01, 2024 13:03 EDT
+# @@Created          :  Tuesday, Oct 01, 2024 15:27 EDT
 # @@File             :  install.sh
 # @@Description      :  Container installer script for dockerproxy
 # @@Changelog        :  New script
@@ -29,7 +29,7 @@
 # shellcheck disable=SC2317
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 export APPNAME="dockerproxy"
-export VERSION="202410011303-git"
+export VERSION="202410011527-git"
 export REPO_BRANCH="${GIT_REPO_BRANCH:-main}"
 export USER="${SUDO_USER:-$USER}"
 export RUN_USER="${RUN_USER:-$USER}"
@@ -336,17 +336,18 @@ HOST_ETC_RESOLVE_INIT_FILE=""
 HOST_ETC_HOSTS_ENABLED="no"
 HOST_ETC_HOSTS_INIT_FILE=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Mount docker socket - [yes/no] [/var/run/docker.sock] [yes/no]
+# Mount docker socket - [yes/no] [yes/no] [/var/run/docker.sock] [/var/run/docker.sock]
 DOCKER_SOCKET_ENABLED="yes"
 DOCKER_SOCKER_READONLY="no"
-DOCKER_SOCKET_MOUNT=""
+HOST_DOCKER_SOCKET_MOUNT=""
+CONTAINER_DOCKER_SOCKET_MOUNT=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Will set --env-file "$DOCKERMGR_CONFIG_DIR/env/$CONTAINER_NAME.env" to docker run [yes/no]
 DOCKER_ENV_FILE_ENABLED=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Mount docker config - [yes/no] [~/.docker/config.json] [/root/.docker/config.json]
 DOCKER_CONFIG_ENABLED="no"
-HOST_DOCKER_CONFIG=""
+HOST_DOCKER_CONFIG_FILE=""
 CONTAINER_DOCKER_CONFIG_FILE=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Mount soundcard - [yes/no] [/dev/snd] [/dev/snd]
@@ -409,7 +410,7 @@ HOST_NGINX_VHOST_CONFIG_NAME=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Enable this if container is running a webserver - [yes/no] [internalPort] [yes/no] [yes/no] [listen]
 CONTAINER_WEB_SERVER_ENABLED="no"
-CONTAINER_WEB_SERVER_INT_PORT="2375"
+CONTAINER_WEB_SERVER_INT_PORT="80"
 CONTAINER_WEB_SERVER_SSL_ENABLED="no"
 CONTAINER_WEB_SERVER_AUTH_ENABLED="no"
 CONTAINER_WEB_SERVER_LISTEN_ON="127.0.0.10"
@@ -574,9 +575,10 @@ CONTAINER_DEBUG_OPTIONS=""
 CONTAINER_CREATE_DIRECTORY="/data/$APPNAME,/data/logs/$APPNAME,/config/$APPNAME "
 CONTAINER_CREATE_DIRECTORY+=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# enable the health check - creates a cron script - [yes/no] [/health]
+# enable the health check - creates a cron script - [yes/no] [/health] [$CONTAINER_NGINX_PROXY_URL]
 HOST_SERVER_HEALTH_CHECK_ENABLED=""
 HOST_SERVER_HEALTH_CHECK_SERVER_URI=""
+HOST_SERVER_HEALTH_CHECK_SERVER_NAME=""
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Containers default username/password
 CONTAINER_DEFAULT_USERNAME=""
@@ -733,10 +735,11 @@ ENV_HOST_ETC_HOSTS_ENABLED="\${ENV_HOST_ETC_HOSTS_ENABLED:-$HOST_ETC_HOSTS_ENABL
 ENV_HOST_ETC_HOSTS_INIT_FILE="\${ENV_HOST_ETC_HOSTS_INIT_FILE:-$HOST_ETC_HOSTS_INIT_FILE}"
 ENV_DOCKER_SOCKET_ENABLED="\${ENV_DOCKER_SOCKET_ENABLED:-$DOCKER_SOCKET_ENABLED}"
 ENV_DOCKER_SOCKER_READONLY="\${ENV_DOCKER_SOCKER_READONLY:-$DOCKER_SOCKER_READONLY}"
-ENV_DOCKER_SOCKET_MOUNT="\${ENV_DOCKER_SOCKET_MOUNT:-$DOCKER_SOCKET_MOUNT}"
+ENV_HOST_DOCKER_SOCKET_MOUNT="\${ENV_HOST_DOCKER_SOCKET_MOUNT:-$HOST_DOCKER_SOCKET_MOUNT}"
+ENV_CONTAINER_DOCKER_SOCKET_MOUNT="\${ENV_CONTAINER_DOCKER_SOCKET_MOUNT:-$CONTAINER_DOCKER_SOCKET_MOUNT}"
 ENV_DOCKER_ENV_FILE_ENABLED="\${ENV_DOCKER_ENV_FILE_ENABLED:-$DOCKER_ENV_FILE_ENABLED}"
 ENV_DOCKER_CONFIG_ENABLED="\${ENV_DOCKER_CONFIG_ENABLED:-$DOCKER_CONFIG_ENABLED}"
-ENV_HOST_DOCKER_CONFIG="\${ENV_HOST_DOCKER_CONFIG:-$HOST_DOCKER_CONFIG}"
+ENV_HOST_DOCKER_CONFIG="\${ENV_HOST_DOCKER_CONFIG:-$HOST_DOCKER_CONFIG_FILE}"
 ENV_CONTAINER_DOCKER_CONFIG_FILE="\${ENV_CONTAINER_DOCKER_CONFIG_FILE:-$CONTAINER_DOCKER_CONFIG_FILE}"
 ENV_DOCKER_SOUND_ENABLED="\${ENV_DOCKER_SOUND_ENABLED:-$DOCKER_SOUND_ENABLED}"
 ENV_HOST_SOUND_DEVICE="\${ENV_HOST_SOUND_DEVICE:-$HOST_SOUND_DEVICE}"
@@ -854,6 +857,7 @@ ENV_CONTAINER_DEBUG_OPTIONS="\${ENV_CONTAINER_DEBUG_OPTIONS:-$CONTAINER_DEBUG_OP
 ENV_CONTAINER_CREATE_DIRECTORY="\${ENV_CONTAINER_CREATE_DIRECTORY:-$CONTAINER_CREATE_DIRECTORY}"
 ENV_HOST_SERVER_HEALTH_CHECK_ENABLED="\${ENV_HOST_SERVER_HEALTH_CHECK_ENABLED:-$HOST_SERVER_HEALTH_CHECK_ENABLED}"
 ENV_HOST_SERVER_HEALTH_CHECK_SERVER_URI="\${ENV_HOST_SERVER_HEALTH_CHECK_SERVER_URI:-$HOST_SERVER_HEALTH_CHECK_SERVER_URI}"
+ENV_HOST_SERVER_HEALTH_CHECK_SERVER_NAME="\${ENV_HOST_SERVER_HEALTH_CHECK_SERVER_NAME:-$HOST_SERVER_HEALTH_CHECK_SERVER_NAME}"
 ENV_CONTAINER_DEFAULT_USERNAME="\${ENV_CONTAINER_DEFAULT_USERNAME:-$CONTAINER_DEFAULT_USERNAME}"
 ENV_POST_SHOW_FINISHED_MESSAGE="\${ENV_POST_SHOW_FINISHED_MESSAGE:-$POST_SHOW_FINISHED_MESSAGE}"
 ENV_DOCKERMGR_ENABLE_INSTALL_SCRIPT="\${ENV_DOCKERMGR_ENABLE_INSTALL_SCRIPT:-$DOCKERMGR_ENABLE_INSTALL_SCRIPT}"
@@ -1185,10 +1189,11 @@ HOST_ETC_HOSTS_ENABLED="${ENV_HOST_ETC_HOSTS_ENABLED:-$HOST_ETC_HOSTS_ENABLED}"
 HOST_ETC_HOSTS_INIT_FILE="${ENV_HOST_ETC_HOSTS_INIT_FILE:-$HOST_ETC_HOSTS_INIT_FILE}"
 DOCKER_SOCKET_ENABLED="${ENV_DOCKER_SOCKET_ENABLED:-$DOCKER_SOCKET_ENABLED}"
 DOCKER_SOCKER_READONLY="${ENV_DOCKER_SOCKER_READONLY:-$DOCKER_SOCKER_READONLY}"
-DOCKER_SOCKET_MOUNT="${ENV_DOCKER_SOCKET_MOUNT:-$DOCKER_SOCKET_MOUNT}"
+HOST_DOCKER_SOCKET_MOUNT="${ENV_HOST_DOCKER_SOCKET_MOUNT:-$HOST_DOCKER_SOCKET_MOUNT}"
+CONTAINER_DOCKER_SOCKET_MOUNT="${ENV_CONTAINER_DOCKER_SOCKET_MOUNT:-$CONTAINER_DOCKER_SOCKET_MOUNT}"
 DOCKER_ENV_FILE_ENABLED="${ENV_DOCKER_ENV_FILE_ENABLED:-$DOCKER_ENV_FILE_ENABLED}"
 DOCKER_CONFIG_ENABLED="${ENV_DOCKER_CONFIG_ENABLED:-$DOCKER_CONFIG_ENABLED}"
-HOST_DOCKER_CONFIG="${ENV_HOST_DOCKER_CONFIG:-$HOST_DOCKER_CONFIG}"
+HOST_DOCKER_CONFIG_FILE="${ENV_HOST_DOCKER_CONFIG:-$HOST_DOCKER_CONFIG_FILE}"
 CONTAINER_DOCKER_CONFIG_FILE="${ENV_CONTAINER_DOCKER_CONFIG_FILE:-$CONTAINER_DOCKER_CONFIG_FILE}"
 DOCKER_SOUND_ENABLED="${ENV_DOCKER_SOUND_ENABLED:-$DOCKER_SOUND_ENABLED}"
 HOST_SOUND_DEVICE="${ENV_HOST_SOUND_DEVICE:-$HOST_SOUND_DEVICE}"
@@ -1306,6 +1311,7 @@ CONTAINER_DEBUG_OPTIONS="${ENV_CONTAINER_DEBUG_OPTIONS:-$CONTAINER_DEBUG_OPTIONS
 CONTAINER_CREATE_DIRECTORY="${ENV_CONTAINER_CREATE_DIRECTORY:-$CONTAINER_CREATE_DIRECTORY}"
 HOST_SERVER_HEALTH_CHECK_ENABLED="${ENV_HOST_SERVER_HEALTH_CHECK_ENABLED:-$HOST_SERVER_HEALTH_CHECK_ENABLED}"
 HOST_SERVER_HEALTH_CHECK_SERVER_URI="${ENV_HOST_SERVER_HEALTH_CHECK_SERVER_URI:-$HOST_SERVER_HEALTH_CHECK_SERVER_URI}"
+HOST_SERVER_HEALTH_CHECK_SERVER_NAME="${ENV_HOST_SERVER_HEALTH_CHECK_SERVER_NAME:-$HOST_SERVER_HEALTH_CHECK_SERVER_NAME}"
 CONTAINER_DEFAULT_USERNAME="${ENV_CONTAINER_DEFAULT_USERNAME:-$CONTAINER_DEFAULT_USERNAME}"
 POST_SHOW_FINISHED_MESSAGE="${ENV_POST_SHOW_FINISHED_MESSAGE:-$POST_SHOW_FINISHED_MESSAGE}"
 DOCKERMGR_ENABLE_INSTALL_SCRIPT="${ENV_DOCKERMGR_ENABLE_INSTALL_SCRIPT:-$DOCKERMGR_ENABLE_INSTALL_SCRIPT}"
@@ -1483,15 +1489,16 @@ fi
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Mount the docker socket
 if [ "$DOCKER_SOCKET_ENABLED" = "yes" ]; then
-  if [ -z "$DOCKER_SOCKET_MOUNT" ]; then
-    if [ -e "/var/run/docker.sock" ]; then
-      DOCKER_SOCKET_TMP_MOUNT="/var/run/docker.sock:/var/run/docker.sock"
-    elif [ -e "$DOCKER_SOCKET_MOUNT" ]; then
-      DOCKER_SOCKET_TMP_MOUNT="$DOCKER_SOCKET_MOUNT:/var/run/docker.sock"
-    fi
+  if [ -z "$HOST_DOCKER_SOCKET_MOUNT" ]; then
+    HOST_DOCKER_SOCKET_MOUNT="/var/run/docker.sock"
+  fi
+  if [ -z "$CONTAINER_DOCKER_SOCKET_MOUNT" ]; then
+    CONTAINER_DOCKER_SOCKET_MOUNT="/var/run/docker.sock"
   fi
   if [ "$DOCKER_SOCKER_READONLY" = "yes" ]; then
-    DOCKER_SOCKET_TMP_MOUNT="$DOCKER_SOCKET_TMP_MOUNT:ro"
+    DOCKER_SOCKET_TMP_MOUNT="$HOST_DOCKER_SOCKET_MOUNT:$CONTAINER_DOCKER_SOCKET_MOUNT:ro"
+  else
+    DOCKER_SOCKET_TMP_MOUNT="$HOST_DOCKER_SOCKET_MOUNT:$CONTAINER_DOCKER_SOCKET_MOUNT"
   fi
   DOCKER_SET_OPTIONS_VOLUME+=("--volume $DOCKER_SOCKET_TMP_MOUNT")
   unset DOCKER_SOCKET_TMP_MOUNT
@@ -1503,8 +1510,8 @@ if [ -r "$CONTAINER_DOCKER_CONFIG_FILE" ] || [ -r "$HOME/.docker/config.json" ];
     if [ -z "$CONTAINER_DOCKER_CONFIG_FILE" ]; then
       CONTAINER_DOCKER_CONFIG_FILE="/root/.docker/config.json"
     fi
-    if [ -n "$HOST_DOCKER_CONFIG" ]; then
-      DOCKER_SET_OPTIONS_VOLUME+=("--volume $HOST_DOCKER_CONFIG:$CONTAINER_DOCKER_CONFIG_FILE:ro")
+    if [ -n "$HOST_DOCKER_CONFIG_FILE" ]; then
+      DOCKER_SET_OPTIONS_VOLUME+=("--volume $HOST_DOCKER_CONFIG_FILE:$CONTAINER_DOCKER_CONFIG_FILE:ro")
     elif [ -f "$HOME/.docker/config.json" ]; then
       DOCKER_SET_OPTIONS_VOLUME+=("--volume $HOME/.docker/config.json:$CONTAINER_DOCKER_CONFIG_FILE:ro")
     fi
@@ -2324,7 +2331,7 @@ EOF
 EOF
           fi
         fi
-        CONTAINER_SERVER_TEST_URL="$nginx_proto://$proxy_url$internal_path"
+        HOST_SERVER_HEALTH_CHECK_SERVER_NAME="${HOST_SERVER_HEALTH_CHECK_SERVER_NAME:-$nginx_proto://$proxy_url$internal_path}"
         unset proxy_info proxy_location proxy_url set_hostname
       fi
     fi
@@ -2358,16 +2365,17 @@ fi
 unset SET_PRETTY_PORT SET_NGINX_PROXY_PORT SET_WEB_PORT_TMP CLEANUP_PORT
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # SSL setup
-NGINX_PROXY_URL=""
 if [ "$NGINX_SSL" = "yes" ]; then
   if [ "$SSL_ENABLED" = "yes" ]; then
     CONTAINER_WEB_SERVER_PROTOCOL="https"
   fi
 fi
-NGINX_PROXY_URL="$CONTAINER_WEB_SERVER_PROTOCOL://$NGINX_PROXY_ADDRESS:$NGINX_PROXY_PORT"
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-NGINX_PROXY_URL="${NGINX_PROXY_URL:-$CONTAINER_WEB_SERVER_PROTOCOL://$NGINX_PROXY_ADDRESS:$NGINX_PROXY_PORT}"
-NGINX_PROXY_URL="${NGINX_PROXY_URL// /}$CONTAINER_WEB_SERVER_EXT_PATH"
+if [ -n "$NGINX_PROXY_ADDRESS" ] && [ -n "$NGINX_PROXY_PORT" ]; then
+  NGINX_PROXY_URL="$CONTAINER_WEB_SERVER_PROTOCOL://$NGINX_PROXY_ADDRESS:$NGINX_PROXY_PORT"
+  NGINX_PROXY_URL="${NGINX_PROXY_URL// /}$CONTAINER_WEB_SERVER_EXT_PATH"
+else
+  unset NGINX_PROXY_URL
+fi
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Set temp env for PORTS ENV variable
 CONTAINER_ENV_PORTS=("${DOCKER_SET_TMP_PUBLISH[@]//--publish/}")
@@ -2707,11 +2715,11 @@ else
   NGINX_VHOST_NAMES="${NGINX_VHOST_NAMES//,/ }"
 fi
 HOST_NGINX_PROXY_URL="${HOST_NGINX_PROXY_URL:-${NGNIX_REVERSE_ADDRESS:-$NGINX_PROXY_URL}}"
-NGNIX_REVERSE_ADDRESS="${CONTAINER_NGINX_PROXY_URL:-${NGNIX_REVERSE_ADDRESS:-$NGINX_PROXY_URL}}"
+NGNIX_REVERSE_ADDRESS="${CONTAINER_NGINX_PROXY_URL:-${NGNIX_REVERSE_ADDRESS:-$HOST_NGINX_PROXY_URL}}"
 CONTAINER_NGINX_PROXY_URL="${CONTAINER_NGINX_PROXY_URL:-$NGNIX_REVERSE_ADDRESS}"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Setup an internal host
-CONTAINER_SERVER_TEST_URL="${CONTAINER_SERVER_TEST_URL:-$NGNIX_REVERSE_ADDRESS}"
+HOST_SERVER_HEALTH_CHECK_SERVER_NAME="${HOST_SERVER_HEALTH_CHECK_SERVER_NAME:-$CONTAINER_NGINX_PROXY_URL}"
 NGINX_VHOSTS_PROXY_INT_TMP="/tmp/$$.$HOST_NGINX_INTERNAL_HOST.$HOST_NGINX_INTERNAL_DOMAIN"
 if [ -n "$NGNIX_REVERSE_ADDRESS" ] && [ -n "$HOST_NGINX_INTERNAL_DOMAIN" ]; then
   HOST_NGINX_INTERNAL_DOMAIN="$HOST_NGINX_INTERNAL_HOST.$HOST_NGINX_INTERNAL_DOMAIN"
@@ -2807,11 +2815,11 @@ if [ "$CONTAINER_INSTALLED" = "true" ] || __docker_ps_all -q; then
     __printf_spacing_color "3" "The internal name is set to:" "$HOST_NGINX_INTERNAL_DOMAIN"
   fi
   printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n'
-  if [ "$HOST_SERVER_HEALTH_CHECK_ENABLED" = "yes" ] && [ -n "$HOST_SERVER_HEALTH_CHECK_SERVER_URI" ]; then
-    __printf_spacing_color "6" "Setting health check command to:" "dockermgr server_status http://$NGNIX_REVERSE_ADDRESS/$HOST_SERVER_HEALTH_CHECK_SERVER_URI"
+  if [ -n "$HOST_SERVER_HEALTH_CHECK_SERVER_NAME" ] && [ "$HOST_SERVER_HEALTH_CHECK_ENABLED" = "yes" ] && [ -n "$HOST_SERVER_HEALTH_CHECK_SERVER_URI" ]; then
+    __printf_spacing_color "6" "Setting health check command to:" "dockermgr server_status $HOST_SERVER_HEALTH_CHECK_SERVER_NAME/$HOST_SERVER_HEALTH_CHECK_SERVER_URI"
     __printf_spacing_color "3" "Saving cron job to: /etc/cron.d/${CONTAINER_NAME}_health"
     __printf_spacing_color "3" "server test file saved to" "$cron_file_name"
-    echo '*/90 * * * * root dockermgr server_status "'$CONTAINER_SERVER_TEST_URL/$HOST_SERVER_HEALTH_CHECK_SERVER_URI'" "'$CONTAINER_NAME'" "'$DOCKERMGR_INSTALL_SCRIPT'"' >"/etc/cron.d/${CONTAINER_NAME}_health"
+    echo '*/90 * * * * root dockermgr server_status "'$HOST_SERVER_HEALTH_CHECK_SERVER_NAME/$HOST_SERVER_HEALTH_CHECK_SERVER_URI'" "'$CONTAINER_NAME'" "'$DOCKERMGR_INSTALL_SCRIPT'"' >"/etc/cron.d/${CONTAINER_NAME}_health"
     printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n'
   fi
   if [ "$HOST_CRON_ENABLED" = "yes" ] && [ -n "$HOST_CRON_COMMAND" ]; then
@@ -2874,21 +2882,6 @@ if [ "$CONTAINER_INSTALLED" = "true" ] || __docker_ps_all -q; then
         __printf_spacing_color "33" "vhost name:" "$vhost"
       done
     fi
-    printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n'
-  fi
-  if [ -n "$SET_PORT" ] && [ -n "$NGINX_PROXY_URL" ]; then
-    MESSAGE="true"
-    __printf_spacing_color "33" "Server address:" "$NGINX_PROXY_URL"
-    if [ -n "$NGINX_VHOST_NAMES" ]; then
-      NGINX_VHOST_NAMES="${NGINX_VHOST_NAMES//,/ }"
-      for vhost in $NGINX_VHOST_NAMES; do
-        __printf_spacing_color "33" "vhost name:" "$vhost"
-      done
-    fi
-    printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n'
-  fi
-  if [ -n "$CONTAINER_ADD_CUSTOM_SINGLE" ]; then
-    __printf_spacing_color "6" "Custom port mapping:" "$CONTAINER_ADD_CUSTOM_SINGLE"
     printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n'
   fi
   if [ -n "$CONTAINER_USER_ADMIN_HASH_PASS" ]; then
@@ -2967,7 +2960,11 @@ if [ "$CONTAINER_INSTALLED" = "true" ] || __docker_ps_all -q; then
     printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n'
   fi
   if [ -z "$SET_PORT" ]; then
-    __printf_spacing_color "3" "This container does not have services configured"
+    if [ -n "$CONTAINER_ADD_CUSTOM_SINGLE" ]; then
+      __printf_spacing_color "6" "Custom port mapping:" "$CONTAINER_ADD_CUSTOM_SINGLE"
+    else
+      intf_spacing_color "3" "This container does not have services configured"
+    fi
     printf '# - - - - - - - - - - - - - - - - - - - - - - - - - -\n'
   else
     for create_service in $SET_PORT; do
