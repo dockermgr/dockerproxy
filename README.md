@@ -19,17 +19,17 @@ dockermgr update dockerproxy
 ## Install and run container
   
 ```shell
-mkdir -p "$HOME/.local/share/srv/docker/dockerproxy/rootfs"
+mkdir -p "$HOME/.local/share/srv/docker/dockerproxy/volumes"
 git clone "https://github.com/dockermgr/dockerproxy" "$HOME/.local/share/CasjaysDev/dockermgr/dockerproxy"
-cp -Rfva "$HOME/.local/share/CasjaysDev/dockermgr/dockerproxy/rootfs/." "$HOME/.local/share/srv/docker/dockerproxy/rootfs/"
+cp -Rfva "$HOME/.local/share/CasjaysDev/dockermgr/dockerproxy/volumes/." "$HOME/.local/share/srv/docker/dockerproxy/volumes/"
 docker run -d \
 --restart always \
 --privileged \
 --name casjaysdevdocker-dockerproxy \
 --hostname dockerproxy \
 -e TZ=${TIMEZONE:-America/New_York} \
--v "$HOME/.local/share/srv/docker/casjaysdevdocker-dockerproxy/rootfs/data:/data:z" \
--v "$HOME/.local/share/srv/docker/casjaysdevdocker-dockerproxy/rootfs/config:/config:z" \
+-v "$HOME/.local/share/srv/docker/casjaysdevdocker-dockerproxy/volumes/data:/data:z" \
+-v "$HOME/.local/share/srv/docker/casjaysdevdocker-dockerproxy/volumes/config:/config:z" \
 -p 80:80 \
 casjaysdevdocker/dockerproxy:latest
 ```
@@ -46,8 +46,8 @@ services:
       - TZ=America/New_York
       - HOSTNAME=dockerproxy
     volumes:
-      - "$HOME/.local/share/srv/docker/casjaysdevdocker-dockerproxy/rootfs/data:/data:z"
-      - "$HOME/.local/share/srv/docker/casjaysdevdocker-dockerproxy/rootfs/config:/config:z"
+      - "$HOME/.local/share/srv/docker/casjaysdevdocker-dockerproxy/volumes/data:/data:z"
+      - "$HOME/.local/share/srv/docker/casjaysdevdocker-dockerproxy/volumes/config:/config:z"
     ports:
       - 80:80
     restart: always
